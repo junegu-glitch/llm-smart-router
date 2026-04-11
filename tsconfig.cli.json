@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "sourceMap": true,
+    "isolatedModules": true
+  },
+  "include": [
+    "src/cli/**/*.ts",
+    "src/lib/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/app/**",
+    "src/components/**",
+    "src/lib/storage.ts",
+    "src/lib/supabase/**"
+  ]
+}
