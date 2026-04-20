@@ -114,31 +114,9 @@ Total cost: $0.00   (3 models, 91 seconds)
 
 ---
 
-## Demo — Single Query Routing
+## Demo — CLI in Action
 
-<!-- Replace with demo-cli.gif when recorded:
 ![Demo CLI w:900](./demo-cli.gif)
--->
-
-```bash
-$ smart-router --verbose "Implement a binary search tree in Python"
-
-  CLI hybrid mode — detected subscriptions:
-  ✓ Claude Code 2.1.101
-  ✓ Gemini CLI 0.36.0
-  ✓ OpenAI Codex 0.118.0
-
-  Route: [coding] → Claude Sonnet 4
-  Reason: Code generation task, best coding benchmark scores.
-
-  - Waiting for Claude Sonnet 4...
-
-  class BSTNode:
-      def __init__(self, val):
-          self.val = val
-          self.left = self.right = None
-  ...
-```
 
 ---
 
@@ -164,6 +142,23 @@ $ smart-router --verbose "Implement a binary search tree in Python"
   ✔ Leader synthesized all results
   Total cost: $0.094   Session saved: ~/.smart-router/sessions/
 ```
+
+---
+
+## Web UI — Same Tool, Browser Interface
+
+Live at: `https://scientific-software-engineering-wit.vercel.app`
+
+| Feature | Stack |
+|---------|-------|
+| Smart-routed chat | Same routing logic as CLI |
+| **Team Mode** (`/team`) | SSE streaming, live dashboard, preset selector |
+| GitHub OAuth login | Supabase Auth |
+| API key management | AES-256-GCM encrypted, cloud-synced |
+| Dark / light mode | Tailwind + system preference |
+
+CLI and web share the same `src/lib/` core — routing, model catalog, provider calls.
+Team mode works both in `smart-router serve` ($0 with CLIs) **and** with BYOK API keys.
 
 ---
 
