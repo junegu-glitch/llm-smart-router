@@ -1,5 +1,9 @@
 # LLM Smart Router
 
+[![CI](https://github.com/junegu-glitch/llm-smart-router/actions/workflows/ci.yml/badge.svg)](https://github.com/junegu-glitch/llm-smart-router/actions/workflows/ci.yml)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 CLI-first AI workflow copilot that routes work to the best model and can spin up small multi-model agent teams from your terminal.
 
 ## Why this exists
