@@ -8,7 +8,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { calculateCost, callLLM } from "../../../src/lib/llm-client.js";
 import { AVAILABLE_MODELS, getModelById } from "../../../src/lib/models.js";
 import { ALL_KEYS } from "../../fixtures/mock-api-keys.js";
-import type { ModelConfig } from "../../../src/lib/types.js";
 
 describe("calculateCost", () => {
   it("should calculate cost correctly for Claude Sonnet", () => {

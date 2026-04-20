@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { runTeammate, runTeammatesParallel } from "../../../src/cli/teammate.js";
-import { ALL_KEYS, GOOGLE_ONLY, NO_KEYS } from "../../fixtures/mock-api-keys.js";
+import { ALL_KEYS, GOOGLE_ONLY } from "../../fixtures/mock-api-keys.js";
 import type { TeammatePlan, Task } from "../../../src/cli/team-types.js";
 
 let fetchMock: ReturnType<typeof vi.fn>;

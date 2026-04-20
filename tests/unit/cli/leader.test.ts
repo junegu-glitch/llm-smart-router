@@ -6,7 +6,7 @@
  * - analyzeAndPlan / synthesizeResults: need LLM mocking
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ALL_KEYS, BUDGET_KEYS, ANTHROPIC_ONLY, GOOGLE_ONLY, NO_KEYS } from "../../fixtures/mock-api-keys.js";
+import { GOOGLE_ONLY } from "../../fixtures/mock-api-keys.js";
 
 // We test analyzeAndPlan with mocked fetch
 describe("analyzeAndPlan", () => {
