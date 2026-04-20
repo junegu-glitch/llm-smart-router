@@ -162,6 +162,12 @@ Team mode works both in `smart-router serve` ($0 with CLIs) **and** with BYOK AP
 
 ---
 
+## Web UI — Live Demo
+
+![Demo Web w:900](./demo-web.gif)
+
+---
+
 ## Evidence: Tests & CI
 
 **154 automated tests** across 12 test files:
