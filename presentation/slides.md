@@ -122,26 +122,7 @@ Total cost: $0.00   (3 models, 91 seconds)
 
 ## Demo — Team Mode
 
-<!-- Replace with demo-team.gif when recorded:
 ![Demo Team w:900](./demo-team.gif)
--->
-
-```
-  Smart Team — Multi-model agent team
-  ✔ Leader planned: 3 teammates, 3 tasks
-
-  ┌──────────────────────────────────────────────────┐
-  │ Live Dashboard              3/3 complete  97s    │
-  ├─────────────────┬────────────────┬───────────────┤
-  │ Teammate        │ Model          │ Status  Cost  │
-  ├─────────────────┼────────────────┼───────────────┤
-  │ TechnicalAnalyst│ Claude Sonnet  │ ✓ done  $0.031│
-  │ PythonCoder     │ GPT-4.1        │ ✓ done  $0.001│
-  │ RustCoder       │ Claude Sonnet  │ ✓ done  $0.062│
-  └─────────────────┴────────────────┴───────────────┘
-  ✔ Leader synthesized all results
-  Total cost: $0.094   Session saved: ~/.smart-router/sessions/
-```
 
 ---
 
@@ -153,6 +134,7 @@ Live at: `https://scientific-software-engineering-wit.vercel.app`
 |---------|-------|
 | Smart-routed chat | Same routing logic as CLI |
 | **Team Mode** (`/team`) | SSE streaming, live dashboard, preset selector |
+| **Live team dashboard** | Per-teammate timer, progress bar, expand all |
 | GitHub OAuth login | Supabase Auth |
 | API key management | AES-256-GCM encrypted, cloud-synced |
 | Dark / light mode | Tailwind + system preference |
@@ -170,10 +152,10 @@ Team mode works both in `smart-router serve` ($0 with CLIs) **and** with BYOK AP
 
 ## Evidence: Tests & CI
 
-**154 automated tests** across 12 test files:
+**167 automated tests** across 14 test files:
 
 ```
-npm test  →  154 passed (154)  in 2.14s
+npm test  →  167 passed (167)  in 2.31s
 ```
 
 | Covered | Tests |
@@ -183,6 +165,8 @@ npm test  →  154 passed (154)  in 2.14s
 | CLI hybrid mode (detection + subprocess) | 21 |
 | Session save / load / list | 18 |
 | Provider fallback chains | 19 |
+| `callLLM` CLI hybrid branch (new) | 6 |
+| Team run $0 cost rollup (new) | 5 |
 
 **GitHub Actions CI** — Node 20 + 22 matrix, runs on every push.
 
