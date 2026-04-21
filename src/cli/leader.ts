@@ -13,6 +13,7 @@
  */
 
 import { callLLM, calculateCost } from "../lib/llm-client.js";
+import { jsonrepair } from "jsonrepair";
 import { AVAILABLE_MODELS } from "../lib/models.js";
 import { ApiKeys, ModelConfig } from "../lib/types.js";
 import {
@@ -156,7 +157,33 @@ export async function analyzeAndPlan(
     // Extract JSON from potential markdown code blocks
     const jsonMatch = result.content.match(/```(?:json)?\s*([\s\S]*?)```/) ||
                       result.content.match(/(\{[\s\S]*\})/);
-    parsed = JSON.parse(jsonMatch?.[1] || result.content);
+    const raw = jsonMatch?.[1] || result.content;
+    // First try clean parse; fall back to jsonrepair for LLM hallucination artifacts
+    // (e.g. stray text inserted between JSON properties by some models)
+    let parseError: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      parseError = e;
+      // Only attempt repair if the content looks like JSON (contains at least one brace)
+      if (raw.includes("{")) {
+        try {
+          const repaired = JSON.parse(jsonrepair(raw));
+          // Validate repaired output has the required plan structure
+          if (repaired && typeof repaired === "object" && "teammates" in repaired && "tasks" in repaired) {
+            parsed = repaired;
+          } else {
+            throw parseError;
+          }
+        } catch (repairErr) {
+          // If repair itself failed, throw original parse error
+          if (repairErr === parseError) throw parseError;
+          throw parseError;
+        }
+      } else {
+        throw parseError;
+      }
+    }
   } catch {
     throw new Error(`Leader failed to produce valid JSON plan:\n${result.content}`);
   }
