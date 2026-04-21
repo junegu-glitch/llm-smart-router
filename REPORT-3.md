@@ -68,7 +68,7 @@ This report covers the final state of the project at:
 
 The submitted repository is a CLI-first package with:
 
-- 154 automated tests (12 test files)
+- 167 automated tests (14 test files)
 - Continuous integration on Node 20 and 22 (GitHub Actions)
 - An optional Next.js web UI for browser-based chat and API key management
 - A `--use-cli` flag for zero-cost team runs using subscription CLIs
@@ -252,14 +252,14 @@ pull request to `main`. The matrix covers Node.js 20 and 22.
 CI steps:
   npm ci                  # reproducible install
   npm run build:cli       # compile TypeScript → dist/cli/
-  npm test                # 154 tests, vitest
+  npm test                # 167 tests, vitest
   npm run lint            # ESLint with eslint-config-next
 ```
 
 Both matrix legs pass at the current head commit. The CI badge in the README
 links directly to the Actions run history.
 
-### Automated Tests (154 passing)
+### Automated Tests (167 passing)
 
 The test suite covers all core modules:
 
@@ -277,11 +277,13 @@ The test suite covers all core modules:
 | `config.test.ts` | API key storage and encryption | 9 |
 | `git-context.test.ts` | Git diff and file context parsing | 13 |
 | `output.test.ts` | Terminal formatting | 8 |
+| `llm-client-cli.test.ts` | `callLLM` CLI hybrid branch | 6 |
+| `team-use-cli.test.ts` | Team run $0 cost rollup | 5 |
 
 ```
 npm test
-→ 154 passed (154)
-→ Duration: 2.14s
+→ 167 passed (167)
+→ Duration: 2.31s
 ```
 
 ### CLI Functionality
@@ -510,9 +512,10 @@ is possible even if one teammate hangs.
 
 **Web UI polish** — The optional Next.js web UI (deployed at
 `https://scientific-software-engineering-wit.vercel.app`) works for basic
-chat and API key management but is not polished enough for independent users.
-The cloud sync (Supabase) and GitHub OAuth login work, but the team mode
-interface in the web UI is incomplete.
+chat and API key management. The team mode dashboard was improved with
+per-teammate elapsed timers, an overall progress bar, a synthesis copy button,
+and an expand-all control. The web UI still requires GitHub login, which limits
+accessibility for independent users without an account.
 
 **Cross-model verification** — The README frames cross-model verification
 (Claude authors → Gemini verifies → Codex challenges → Claude judges) as the
@@ -527,7 +530,7 @@ execution.
 | Item | Status |
 |---|---|
 | GitHub repository (public) | ✓ `github.com/junegu-glitch/llm-smart-router` |
-| Tests | ✓ 154 passing (`npm test`) |
+| Tests | ✓ 167 passing (`npm test`) |
 | CI badge in README | ✓ GitHub Actions, Node 20 + 22 |
 | README with install and usage | ✓ `README.md` |
 | Examples of usage | ✓ `examples/` (4 files) |
