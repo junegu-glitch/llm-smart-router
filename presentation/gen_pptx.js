@@ -1,4 +1,37 @@
+import fs from "node:fs";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 const pptxgen = require("/opt/homebrew/lib/node_modules/pptxgenjs");
+
+const ROOT = "/Users/junemog/Documents/GitHub/llm-smart-router";
+const ASSETS = {
+  demoCli: `${ROOT}/presentation/demo-cli.gif`,
+  demoTeam: `${ROOT}/presentation/demo-team.gif`,
+  demoWeb: `${ROOT}/presentation/demo-web.gif`,
+};
+const SCRIPT_PATH = `${ROOT}/presentation/script.md`;
+const SCRIPT_NOTES = loadScriptNotes(SCRIPT_PATH);
+
+function loadScriptNotes(scriptPath) {
+  const raw = fs.readFileSync(scriptPath, "utf8");
+  const notes = {};
+  const sectionRe = /^## Slide (\d+) .*$/gm;
+  const matches = [...raw.matchAll(sectionRe)];
+  matches.forEach((match, i) => {
+    const slideNo = Number(match[1]);
+    const start = match.index + match[0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index : raw.length;
+    const text = raw.slice(start, end)
+      .split("\n")
+      .filter(line => !line.startsWith("> ⏱"))
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    notes[slideNo] = text;
+  });
+  return notes;
+}
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 const C = {
@@ -94,6 +127,23 @@ function badge(slide, text, x, y) {
   });
 }
 
+function addSlideNotes(slide, slideNo) {
+  const notes = SCRIPT_NOTES[slideNo];
+  if (notes) slide.addNotes(notes);
+}
+
+function demoGif(slide, assetPath, borderColor) {
+  slide.addShape(pres.shapes.RECTANGLE, {
+    x: 1, y: 1.2, w: 8, h: 3.4,
+    fill: { color: "0d1117" }, line: { color: borderColor, pt: 2 },
+  });
+  slide.addImage({
+    path: assetPath,
+    x: 1, y: 1.2, w: 8, h: 3.4,
+    sizing: { type: "contain", x: 1, y: 1.2, w: 8, h: 3.4 },
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Slide 1 — Title (dark)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,6 +188,7 @@ function badge(slide, text, x, y) {
     fontSize: 12, color: "818cf8", fontFace: "Consolas",
     align: "center", margin: 0,
   });
+  addSlideNotes(s, 1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -179,6 +230,7 @@ function badge(slide, text, x, y) {
     fontSize: 14, bold: true, color: C.indigo, fontFace: "Calibri",
     italic: true, margin: 0,
   });
+  addSlideNotes(s, 2);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -209,6 +261,7 @@ smart-router team run --use-cli "Compare React vs Vue"
     fontSize: 14, bold: true, color: C.navy, fontFace: "Calibri",
     align: "center", margin: 0,
   });
+  addSlideNotes(s, 3);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -297,6 +350,7 @@ smart-router team run --use-cli "Compare React vs Vue"
     x: 0.4, y: 5.18, w: 9.2, h: 0.3,
     fontSize: 11, color: C.gray400, fontFace: "Calibri", italic: true, margin: 0,
   });
+  addSlideNotes(s, 4);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -353,6 +407,7 @@ Total cost: $0.00   (3 models, 91 seconds)`,
     x: 0.45, y: 4.45, w: 9.1, h: 0.35,
     fontSize: 13, bold: true, color: C.indigo, italic: true, fontFace: "Calibri", margin: 0,
   });
+  addSlideNotes(s, 5);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -368,22 +423,14 @@ Total cost: $0.00   (3 models, 91 seconds)`,
     align: "center", margin: 0,
   });
 
-  s.addShape(pres.shapes.RECTANGLE, {
-    x: 1, y: 1.2, w: 8, h: 3.4,
-    fill: { color: "0d1117" }, line: { color: C.indigo, pt: 2 },
-  });
-
-  s.addText("[ demo-cli.gif ]", {
-    x: 1, y: 2.3, w: 8, h: 1.2,
-    fontSize: 18, color: C.gray400, fontFace: "Consolas",
-    align: "center", valign: "middle", margin: 0,
-  });
+  demoGif(s, ASSETS.demoCli, C.indigo);
 
   s.addText("smart-router team run --use-cli \"Compare Python vs Rust\"", {
     x: 1, y: 4.78, w: 8, h: 0.35,
     fontSize: 11, color: "818cf8", fontFace: "Consolas",
     align: "center", margin: 0,
   });
+  addSlideNotes(s, 6);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -399,22 +446,14 @@ Total cost: $0.00   (3 models, 91 seconds)`,
     align: "center", margin: 0,
   });
 
-  s.addShape(pres.shapes.RECTANGLE, {
-    x: 1, y: 1.2, w: 8, h: 3.4,
-    fill: { color: "0d1117" }, line: { color: C.indigo, pt: 2 },
-  });
-
-  s.addText("[ demo-team.gif ]", {
-    x: 1, y: 2.3, w: 8, h: 1.2,
-    fontSize: 18, color: C.gray400, fontFace: "Consolas",
-    align: "center", valign: "middle", margin: 0,
-  });
+  demoGif(s, ASSETS.demoTeam, C.indigo);
 
   s.addText("Initial → Task Input → Running (timers, progress bar) → Done (synthesis, $0.00)", {
     x: 1, y: 4.78, w: 8, h: 0.35,
     fontSize: 11, color: "818cf8", fontFace: "Calibri",
     align: "center", margin: 0,
   });
+  addSlideNotes(s, 7);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -455,6 +494,7 @@ Total cost: $0.00   (3 models, 91 seconds)`,
     x: 0.45, y: 5.05, w: 9.1, h: 0.3,
     fontSize: 11, italic: true, color: C.gray400, fontFace: "Calibri", margin: 0,
   });
+  addSlideNotes(s, 8);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -470,22 +510,14 @@ Total cost: $0.00   (3 models, 91 seconds)`,
     align: "center", margin: 0,
   });
 
-  s.addShape(pres.shapes.RECTANGLE, {
-    x: 1, y: 1.2, w: 8, h: 3.4,
-    fill: { color: "0d1117" }, line: { color: "0891B2", pt: 2 },
-  });
-
-  s.addText("[ demo-web.gif ]", {
-    x: 1, y: 2.3, w: 8, h: 1.2,
-    fontSize: 18, color: C.gray400, fontFace: "Consolas",
-    align: "center", valign: "middle", margin: 0,
-  });
+  demoGif(s, ASSETS.demoWeb, "0891B2");
 
   s.addText("Chat → Team page → Done state (synthesis, CLI badges)", {
     x: 1, y: 4.78, w: 8, h: 0.35,
     fontSize: 11, color: "67e8f9", fontFace: "Calibri",
     align: "center", margin: 0,
   });
+  addSlideNotes(s, 9);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -558,6 +590,7 @@ npm run lint`,
     fontSize: 12, color: C.indigo, bold: true, fontFace: "Calibri",
     align: "center", valign: "middle", margin: 0,
   });
+  addSlideNotes(s, 10);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -610,6 +643,7 @@ npm run lint`,
     x: 0.45, y: 5.1, w: 9.1, h: 0.3,
     fontSize: 12, italic: true, color: C.gray400, fontFace: "Calibri", margin: 0,
   });
+  addSlideNotes(s, 11);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -665,6 +699,7 @@ npm run lint`,
       valign: "middle", margin: 0,
     }
   );
+  addSlideNotes(s, 12);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -715,6 +750,7 @@ npm run lint`,
       valign: "top", margin: 0,
     });
   });
+  addSlideNotes(s, 13);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -768,6 +804,7 @@ npm run lint`,
     fontSize: 12, color: "c7d2fe", fontFace: "Consolas",
     align: "center", margin: 0,
   });
+  addSlideNotes(s, 14);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -788,6 +825,7 @@ npm run lint`,
     fontSize: 14, color: "818cf8", fontFace: "Consolas",
     align: "center", margin: 0,
   });
+  addSlideNotes(s, 15);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
