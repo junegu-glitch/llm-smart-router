@@ -34,21 +34,36 @@ rather than billable API tokens.
 
 ### The Problem It Solves
 
-The problem is choice at scale. A developer using multiple AI providers daily
-faces two friction points:
+Many of us in research and academic settings have access to multiple LLM
+subscriptions simultaneously. At CMU, students receive a year of Gemini
+access; Prof. Kitchin provided the class with Claude subscriptions; and some
+of us personally subscribe to Codex CLI as well. Yet almost all of these are
+$20/month plans with limited monthly tokens, and the models run out faster
+than expected.
 
-1. **Routing friction** — deciding which model is appropriate for the current
-   task requires knowing each provider's strengths, current pricing, and context
-   limits. Most users default to one premium model for everything, which is
-   expensive for simple tasks and still suboptimal for specialized ones.
+Anthropic has demonstrated an "agent team" pattern where you structure a group
+of AI agents with distinct roles — CEO, designer, finance manager — and let
+them collaborate on a problem. This pattern is compelling for two reasons:
 
-2. **Orchestration friction** — large technical tasks benefit from multiple
-   independent perspectives (e.g., a security reviewer and a quality reviewer
-   both looking at the same code change), but running separate queries,
-   combining results, and asking a synthesizing model to reconcile them is
-   manual, slow, and easy to skip.
+1. **Context accumulation** — in a single long session, as context piles up, the
+   agent degrades. Every developer who has worked through a complex project in
+   one session has felt this. Agent teams avoid it because each teammate has
+   its own fresh context window.
 
-`llm-smart-router` eliminates both friction points from the command line:
+2. **Parallel specialization** — teammates share only the information that is
+   necessary, similar to how people collaborate in a company. Each agent stays
+   in its optimal context range.
+
+The problem: if you run this kind of agent team entirely within one LLM
+subscription, you exhaust tokens extremely quickly. And if you switch to a
+different provider mid-project, you lose workflow continuity — reloading
+context into the new model costs more tokens and introduces inconsistency.
+
+The core question that motivated this project: **Can we form an agent team
+that spans different LLM services, so that we can use tokens efficiently
+across subscriptions without losing workflow continuity?**
+
+`llm-smart-router` answers that question from the command line:
 
 ```bash
 # Single routed query — model chosen automatically
@@ -79,12 +94,25 @@ The submitted repository is a CLI-first package with:
 
 ### Decision 1 — Seven-Category Routing Over Binary Classification
 
+Building this tool required me to form personal opinions about each model's
+strengths — not from benchmarks alone, but from extended use across different
+task types:
+
+- **Claude** — the strongest model I have used for reasoning and coding. However,
+  its token allocation runs out faster than any other subscription I have.
+- **Gemini** — has a one-million-token context window, which is essential for
+  long documents, and provides the most generous token allowance of any plan.
+- **Codex** — solid overall performance, with a particular strength in planning
+  and structured problem decomposition.
+- **DeepSeek V3** — API-only (no CLI binary), but at under three cents per million
+  output tokens it is the cheapest capable model for undifferentiated general tasks.
+
 The simplest routing approach would be "complex task → premium model, simple
-task → cheap model." I rejected this because it loses precision: a
-mathematical proof is complex but benefits specifically from a reasoning-tuned
-model (DeepSeek R1), not just any premium model. A large-document analysis
-benefits specifically from a 1M-context model (Gemini 2.5 Pro), not a
-faster coding-focused model.
+task → cheap model." I rejected this because it loses precision: a mathematical
+proof is complex but benefits specifically from a reasoning-tuned model
+(DeepSeek R1), not just any premium model. A large-document analysis benefits
+specifically from a 1M-context model (Gemini 2.5 Pro), not a faster coding-focused
+model.
 
 The final design uses seven categories:
 
@@ -193,6 +221,33 @@ logic — within a few hours. The core modules that needed subsequent iteration
 were the routing classifier, the team orchestrator, and the subscription CLI
 integration.
 
+### Multi-Model Collaborative Development
+
+One of the less obvious design choices was to use multiple different AI models
+during development itself — not just as the target of the router, but as
+collaborators with distinct roles in building it.
+
+**Novelty validation**: Before committing to this project direction, I asked
+Gemini to deep-research whether the idea was novel. It took approximately 20
+minutes and returned a thorough competitive landscape analysis. There are some
+adjacent projects, but the specific combination of cross-subscription CLI
+hybrid mode, smart routing, and team orchestration still appeared to be
+novel. That answer cleared the way to keep working.
+
+**Development loop**: For significant technical decisions, I developed a
+multi-model loop: I would use Claude to ultra-plan the approach, send the
+plan to Codex for adversarial review, bring the review back to Claude to
+discuss whether the critiques were valid, and separately discuss my own
+intuitions with Gemini. This was not a formal pipeline — it was conversational
+and iterative — but it consistently surfaced perspectives I would not have
+reached in a single-model session.
+
+The key observation from this process: different models have genuinely distinct
+reasonable perspectives, not just stylistically but architecturally. Claude
+tends to think from correctness and safety first; Codex tends to think from
+structure and planning; Gemini tends to take a broader systems view. Using all
+three produced better designs than any one alone.
+
 ### Where Human Judgment Was Essential
 
 **Request timeout handling**: An early version of the teammate executor could
@@ -223,6 +278,17 @@ providers." I pushed the framing toward the more differentiated story:
 cross-model verification, zero-cost CLI hybrid mode, and the parallel agent
 team as a first-class workflow. This reframing influenced how features were
 prioritized and how the README and examples were written.
+
+### Why a Web UI
+
+I have been using the terminal since joining Kitchin lab, but before that
+I had no command-line experience. Building this tool for researchers and
+students who are in the same position I was — technically capable, but not
+yet comfortable in a terminal — motivated the optional web UI. The goal was
+an interface that could be used intuitively by anyone who had already
+interacted with a chat-based AI product, without requiring any CLI knowledge.
+The CLI and the web UI share the same `src/lib/` routing and orchestration
+core, so any improvement to the router applies equally to both surfaces.
 
 ### Repository Structure
 
@@ -441,31 +507,30 @@ using AI to build it, and the orchestrator itself runs AI models as teammates.
 
 ### How My Use of Claude Code Changed
 
-**At the beginning of the course**, I used Claude Code as a code generator.
-I gave it specific prompts ("add a config subcommand that saves API keys"),
-accepted what it produced, and manually fixed problems I found. The mental
-model was: AI writes draft code, human reviews and edits.
+**At the beginning of the course**: AI writes a draft, I fix it. I gave Claude
+Code specific prompts, accepted what it produced, and manually corrected
+problems I found. The mental model was entirely reactive — wait for output, then
+review.
 
-**By Project 2**, I started using it as a design partner before writing code.
-I would describe what I wanted the CLI to do and have Claude Code think through
-the design before implementation. I also learned to ask for corrections
-explicitly: "the timeout handling is wrong — it should fail after 120 seconds
-with this specific error message." The mental model shifted to: human decides
-design and invariants, AI implements, human verifies behavior.
+**By Project 2**: I started planning thoroughly before executing. I would
+discuss with Claude whether my overall approach made sense before writing any
+code. The shift was from "generate code" to "validate ideas." I also learned
+to ask for corrections explicitly: "the timeout handling is wrong — it should
+fail after 120 seconds with this specific error message." The mental model
+shifted to: human decides design and invariants, AI implements, human
+verifies behavior.
 
-**For the final project**, the mental model shifted again. I was using Claude
-Code to:
-- Maintain a persistent wiki (`wiki/index.md`, `/ingest`, `/query`, `/lint`)
-  so that new sessions started with full project context rather than from
-  scratch
-- Use plan mode to design multi-step changes before executing them
-- Orchestrate the tool's own documentation, CI setup, and evidence collection
-- Build the subscription CLI hybrid mode, which is itself a form of
-  multi-agent orchestration implemented with Claude Code
+**For the final project**, the mental model shifted again. I was using:
+- Plan mode before any significant change
+- A persistent wiki (`wiki/index.md`, `/ingest`, `/query`, `/lint`) so that
+  each new session started with full project context rather than from scratch
+- Multiple different models for different roles in development itself
+  (planning with Claude, review with Codex, perspective checks with Gemini)
 
-The irony of the final project is deliberate: `llm-smart-router` coordinates
-multi-model teams, and it was built using a multi-session agentic workflow in
-Claude Code, with persistent context maintained across sessions.
+The meta-moment of the project is deliberate: I used Claude Code to build a
+tool that runs Claude, Gemini, and Codex as parallel subprocesses. The
+orchestrator was built by an agent. The agents it orchestrates include the
+agent that built it.
 
 ### What Changed and What Stayed Hard
 
@@ -495,33 +560,33 @@ Claude Code, with persistent context maintained across sessions.
 
 ## 6. Limitations and Future Work
 
-**Provider credential management** — The current BYOK model requires each user
-to manually configure API keys. A production version would benefit from
-one-command setup (e.g., `smart-router auth` that walks through provider
-authentication interactively).
+**Provider setup friction** — The current BYOK model requires each user to
+manually configure API keys per provider. A guided `smart-router auth` wizard
+that walks through authentication for each supported provider would
+significantly lower this barrier, especially for users who are not comfortable
+with terminal configuration.
 
-**Routing accuracy** — The seven-category classifier is accurate for clear-cut
-cases but ambiguous for mixed requests (e.g., a prompt that asks for both
-a mathematical derivation and a code implementation). A more granular or
-ensemble-based classifier could improve precision.
+**Routing edge cases** — The seven-category classifier handles clear-cut task
+types well but struggles with mixed prompts. A request that is simultaneously
+a mathematical derivation and a code implementation does not map cleanly to
+a single category. A more granular or ensemble-based classifier could improve
+precision for ambiguous inputs.
 
-**Team failure transparency** — When a teammate fails, the current synthesis
-step acknowledges the failure but cannot recover the partial work. A better
-design would checkpoint teammate outputs as they arrive, so a partial synthesis
-is possible even if one teammate hangs.
+**Cross-model verification** — The README describes a cross-model verification
+pipeline (Claude authors → Gemini verifies → Codex challenges → Claude judges)
+as a natural extension of the team mode. This pipeline is not yet implemented
+as a preset. It would require chained rather than parallel execution, which is
+a different orchestration model from what currently exists.
 
-**Web UI polish** — The optional Next.js web UI (deployed at
-`https://scientific-software-engineering-wit.vercel.app`) works for basic
-chat and API key management. The team mode dashboard was improved with
-per-teammate elapsed timers, an overall progress bar, a synthesis copy button,
-and an expand-all control. The web UI still requires GitHub login, which limits
-accessibility for independent users without an account.
-
-**Cross-model verification** — The README frames cross-model verification
-(Claude authors → Gemini verifies → Codex challenges → Claude judges) as the
-"killer feature," but the current team mode does not natively support this
-pipeline. It would require a new preset type with chained rather than parallel
-execution.
+**Maintenance** — I do not personally know how to write TypeScript. This
+project was designed and implemented with AI coding tools throughout. If a
+significant bug surfaces six months from now — a provider API change, a
+breaking dependency update, a parsing regression in the CLI hybrid mode — I
+am not certain I can debug and fix it without AI assistance. This is an honest
+limitation of building in a language you do not yet own. It also raises a
+broader question about the long-term maintainability of AI-authored codebases
+when the human collaborator's debugging depth is shallower than the code's
+complexity.
 
 ---
 
