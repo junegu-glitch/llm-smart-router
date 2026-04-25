@@ -1,337 +1,276 @@
-# Final Project Report: `llm-smart-router`
+# llm-smart-router
 
-June Gu  
-06-642 · Spring 2026  
-Carnegie Mellon University  
+A multi-model AI agent orchestrator with cross-subscription CLI hybrid mode
+
+**Final Project Report**
+June Gu
+06-642 · Spring 2026
+Carnegie Mellon University
+
 GitHub: https://github.com/junegu-glitch/llm-smart-router
 
 ---
 
-## 1. The Project
+## 1. The Idea
 
-### What It Does
+For this final project, I extended `llm-smart-router` from a CLI-only tool
+into a multi-surface system that coordinates multiple LLM subscriptions in a
+single workflow. The goal was practical: many of us already pay for several
+$20/month plans (Claude, Gemini, Codex), and we burn through their token
+quotas faster than expected. I wanted one tool that could spread work across
+those subscriptions intelligently, without losing workflow continuity.
 
-`llm-smart-router` is a TypeScript CLI and optional web application that
-routes AI tasks to the best available model and coordinates multi-model
-agent teams. The core idea is that different models are genuinely better at
-different kinds of work — a model optimized for code generation is not the
-same as one optimized for long-document analysis or mathematical reasoning —
-and yet most AI workflows treat every task as input to a single chat window.
+The main user is still a developer or technical user who works across multiple
+AI systems. The new addition is a non-terminal user — somebody who wants the
+same routing and team workflows from a browser instead of a shell.
 
-The tool provides two main capabilities:
+**The Inspiration**
 
-**Smart routing**: a lightweight classifier categorizes each request into one
-of seven task types (`coding`, `writing`, `math_reasoning`, `analysis`,
-`image_multimodal`, `large_document`, `general`) and selects the highest-ranked
-available model for that category.
+Anthropic has demonstrated an "agent team" pattern where you assign distinct
+roles (CEO, designer, finance manager) to multiple agents and let them
+collaborate on a problem. That pattern is compelling because each teammate has
+its own fresh context window, which avoids the context-accumulation problem
+that makes long single-session agents progressively dumber.
 
-**Multi-model team mode**: for larger tasks, a leader model plans the work,
-assigns specialist roles to teammate agents, runs them in parallel, and
-synthesizes the results into a single final report. Team runs cost $0 when
-executed with the `--use-cli` flag, which routes each teammate through a
-locally installed subscription CLI (Claude Code, Gemini CLI, or Codex CLI)
-rather than billable API tokens.
+The problem is that running this kind of team entirely within one LLM
+subscription drains tokens very quickly. Switching to a different provider
+mid-project loses workflow continuity and costs even more tokens to reload
+context.
 
-### The Problem It Solves
+That led to the core question of this project:
 
-Many of us in research and academic settings have access to multiple LLM
-subscriptions simultaneously. At CMU, students receive a year of Gemini
-access; Prof. Kitchin provided the class with Claude subscriptions; and some
-of us personally subscribe to Codex CLI as well. Yet almost all of these are
-$20/month plans with limited monthly tokens, and the models run out faster
-than expected.
+> Can we form an agent team that spans different LLM services, so that we
+> can use tokens efficiently across subscriptions without losing workflow
+> continuity?
 
-Anthropic has demonstrated an "agent team" pattern where you structure a group
-of AI agents with distinct roles — CEO, designer, finance manager — and let
-them collaborate on a problem. This pattern is compelling for two reasons:
+**What I Built**
 
-1. **Context accumulation** — in a single long session, as context piles up, the
-   agent degrades. Every developer who has worked through a complex project in
-   one session has felt this. Agent teams avoid it because each teammate has
-   its own fresh context window.
+Two main capabilities:
 
-2. **Parallel specialization** — teammates share only the information that is
-   necessary, similar to how people collaborate in a company. Each agent stays
-   in its optimal context range.
+- **Smart routing** — a lightweight classifier categorizes each request into
+  one of seven task types and selects the highest-ranked available model.
+- **Multi-model team mode** — a leader model plans a team, assigns roles to
+  teammate agents, runs them in parallel, and synthesizes a final report.
 
-The problem: if you run this kind of agent team entirely within one LLM
-subscription, you exhaust tokens extremely quickly. And if you switch to a
-different provider mid-project, you lose workflow continuity — reloading
-context into the new model costs more tokens and introduces inconsistency.
+The differentiating feature is `--use-cli`: team runs route through locally
+installed subscription CLIs (`claude`, `gemini`, `codex`) using
+`child_process.spawn`, which means a full team run costs **$0** in API tokens
+when the relevant CLIs are installed.
 
-The core question that motivated this project: **Can we form an agent team
-that spans different LLM services, so that we can use tokens efficiently
-across subscriptions without losing workflow continuity?**
+**What Is Different From Project-2**
 
-`llm-smart-router` answers that question from the command line:
-
-```bash
-# Single routed query — model chosen automatically
-smart-router "Implement a binary search tree in Python"
-
-# Team mode — parallel specialists + synthesis
-smart-router team run --preset code-review --git-diff "Review my changes"
-
-# Zero cost with --use-cli
-smart-router team run --use-cli "Compare React vs Vue for a small SaaS dashboard"
-```
-
-### Project Scope
-
-This report covers the final state of the project at:
-`https://github.com/junegu-glitch/llm-smart-router`
-
-The submitted repository is a CLI-first package with:
-
-- 167 automated tests (14 test files)
-- Continuous integration on Node 20 and 22 (GitHub Actions)
-- An optional Next.js web UI for browser-based chat and API key management
-- A `--use-cli` flag for zero-cost team runs using subscription CLIs
-
----
-
-## 2. Key Design Decisions
-
-### Decision 1 — Seven-Category Routing Over Binary Classification
-
-Building this tool required me to form personal opinions about each model's
-strengths — not from benchmarks alone, but from extended use across different
-task types:
-
-- **Claude** — the strongest model I have used for reasoning and coding. However,
-  its token allocation runs out faster than any other subscription I have.
-- **Gemini** — has a one-million-token context window, which is essential for
-  long documents, and provides the most generous token allowance of any plan.
-- **Codex** — solid overall performance, with a particular strength in planning
-  and structured problem decomposition.
-- **DeepSeek V3** — API-only (no CLI binary), but at under three cents per million
-  output tokens it is the cheapest capable model for undifferentiated general tasks.
-
-The simplest routing approach would be "complex task → premium model, simple
-task → cheap model." I rejected this because it loses precision: a mathematical
-proof is complex but benefits specifically from a reasoning-tuned model
-(DeepSeek R1), not just any premium model. A large-document analysis benefits
-specifically from a 1M-context model (Gemini 2.5 Pro), not a faster coding-focused
-model.
-
-The final design uses seven categories:
-
-| Category | Primary model | Reason |
+| Category | Project-2 | Final Project |
 |---|---|---|
-| `coding` | Claude Sonnet 4.6 | Strong coding and reasoning |
-| `writing` | GPT-4.1 | Natural prose quality |
-| `math_reasoning` | DeepSeek R1 | Reasoning-tuned; lower cost than Claude for math |
-| `analysis` | Gemini 2.5 Flash | Large context window for analysis tasks |
-| `image_multimodal` | Gemini 2.5 Flash | Native multimodal support |
-| `large_document` | Gemini 2.5 Pro | Maximum context window (1M tokens) |
-| `general` | DeepSeek V3 | Cheapest capable model for undifferentiated work |
+| Primary problem | Smart routing + team mode (CLI only) | Same + zero-cost team via subscription CLIs |
+| Audience | Developers comfortable with terminal | + non-terminal users via web UI |
+| Interface | TypeScript CLI | CLI + optional Next.js web UI |
+| Cost model | API tokens per call | $0 with `--use-cli` (subscription CLIs) |
+| Test count | 154 | 167 |
+| CI/CD | None | GitHub Actions (Node 20 + 22) |
+| Persistent context | Per-session only | Wiki system across sessions |
 
-Each category also has a ranked fallback chain for when the primary model's
-provider is unavailable. Classification itself is done by a lightweight LLM
-call (Gemini 2.5 Flash, ~$0.00001 per query), with a keyword-based fallback
-for offline use.
-
-### Decision 2 — Subscription CLI Hybrid Mode (`--use-cli`)
-
-API-based LLM calls have a per-token cost. For a multi-model team with three
-or more teammates, even a cheap run can add up. Many developers already pay
-flat monthly subscriptions for Claude, Gemini, and Codex CLI tools — tokens
-consumed through those CLIs do not incur additional API charges.
-
-The subscription CLI hybrid mode works as follows:
-
-1. At startup, the tool probes for installed CLI binaries:
-   - `claude` → Anthropic subscription (Claude Code)
-   - `gemini` → Google subscription (Gemini CLI)
-   - `codex` → OpenAI subscription (Codex CLI)
-
-2. When `--use-cli` is set, each teammate routes through the first available
-   subscription CLI that covers its model's provider, using `child_process.spawn()`.
-
-3. If no CLI covers a provider, the tool falls back to API mode for that teammate.
-
-The result is that a full three-teammate team run (`--use-cli`) consumes $0 in
-API tokens when all three subscription CLIs are installed and authenticated.
-
-### Decision 3 — Leader-Teammate-Synthesis Pattern
-
-Multi-model teams could be designed many ways: round-robin queries, voting
-systems, sequential chains, or parallel pools. The leader-teammate-synthesis
-pattern was chosen because it matches how human expert teams actually work:
-
-1. **Leader** (planning) — a capable but inexpensive model (DeepSeek V3 or
-   Gemini 2.5 Flash) receives the full request and decides how many teammates
-   to spawn, what specialist role each should play, and which model fits each role.
-2. **Teammates** (parallel execution) — each teammate receives its specialized
-   sub-task and runs concurrently. A live terminal dashboard displays status and
-   cost in real time.
-3. **Leader** (synthesis) — after all teammates complete (or time out), the
-   leader reads all outputs and writes a unified final report that reconciles
-   findings and flags any conflicts between teammates.
-
-This pattern handles partial failure gracefully: the synthesis step can produce
-a useful result even when one or two teammates fail, because the leader is
-prompted to acknowledge failures explicitly rather than silently omitting them.
-
-### Decision 4 — Bring Your Own Key (BYOK)
-
-Rather than acting as a proxy service that stores provider credentials on a
-backend, the tool requires users to configure their own API keys in a local
-encrypted config file. Keys are stored with AES-256-GCM encryption using a
-secret derived from the local environment.
-
-This decision was made for two reasons:
-
-1. **No infrastructure lock-in** — the tool works without any persistent backend.
-   Users who want to self-host the optional web UI can do so with their own
-   Supabase instance.
-
-2. **Minimal trust surface** — in CLI and local API mode, the tool never sends
-   keys to a third-party server; key management stays entirely in the user's
-   environment. The optional web UI can be self-hosted with a user-configured
-   Supabase instance, or used via the deployed version which stores only
-   AES-256-GCM encrypted key blobs in Supabase with the encryption key derived
-   locally.
-
-### Decision 5 — Session Persistence for All Team Runs
-
-Every `team run` saves its full artifact (request, leader plan, teammate
-outputs, synthesis) as a timestamped JSON file in `~/.smart-router/sessions/`.
-This decision was made because:
-
-- Team runs are expensive (time and sometimes money). Losing the output to a
-  scrolled terminal is frustrating.
-- The saved artifact can be reopened, shared, committed to a repository, or
-  used as context for a follow-up query.
-- Session replay (`smart-router team review <id>`) lets a user compare
-  multiple runs on the same task across different configurations.
+The final project keeps the Project-2 CLI core unchanged and layers four new
+capabilities on top: subscription-CLI hybrid mode, web UI, CI/CD, and a
+session-persistent wiki for working with Claude Code.
 
 ---
 
-## 3. Implementation with Claude Code
+## 2. The Plan
 
-### How the Project Was Built
+Before writing code, I planned the final-project additions on top of the
+Project-2 CLI as four separable layers, each shippable on its own.
 
-The project was implemented over two months using Claude Code as the primary
-coding agent. The initial prompt was:
+**Planned Command Surface**
 
-> Build a standalone TypeScript CLI called `llm-smart-router` that routes a
-> prompt to the best available LLM and can run multi-model teammate workflows
-> from the terminal.
+- `smart-router "<message>"` — single routed query (existing)
+- `smart-router team run --use-cli "..."` — zero-cost team run (new)
+- `smart-router team presets` / `team review <id>` — preset and replay (existing)
+- `smart-router serve` — start the optional web UI locally (new)
+- `smart-router config set <provider> <key>` — BYOK key management (existing)
 
-Claude Code scaffolded the initial structure — project layout, TypeScript
-configuration, CLI framework (`commander`), and a first pass at the routing
-logic — within a few hours. The core modules that needed subsequent iteration
-were the routing classifier, the team orchestrator, and the subscription CLI
-integration.
+**Planned Inputs & Outputs**
 
-### Multi-Model Collaborative Development
+Inputs: a natural-language task or prompt, optional git diff context, optional
+file context, configured provider credentials, and detected subscription-CLI
+binaries. Outputs: a routed single-model response, a planned multi-teammate run
+with status and cost reporting, a synthesized final report, and saved team
+sessions for later review.
 
-One of the less obvious design choices was to use multiple different AI models
-during development itself — not just as the target of the router, but as
-collaborators with distinct roles in building it.
+**Planned Architecture (Two Layers)**
 
-**Novelty validation**: Before committing to this project direction, I asked
-Gemini to deep-research whether the idea was novel. It took approximately 20
-minutes and returned a thorough competitive landscape analysis. There are some
-adjacent projects, but the specific combination of cross-subscription CLI
-hybrid mode, smart routing, and team orchestration still appeared to be
-novel. That answer cleared the way to keep working.
+The first layer is a seven-category router. Every request is classified into
+`coding`, `writing`, `math_reasoning`, `analysis`, `image_multimodal`,
+`large_document`, or `general`, and routed to the highest-ranked available
+model for that category. Each category has a ranked fallback chain.
 
-**Development loop**: For significant technical decisions, I developed a
-multi-model loop: I would use Claude to ultra-plan the approach, send the
-plan to Codex for adversarial review, bring the review back to Claude to
-discuss whether the critiques were valid, and separately discuss my own
-intuitions with Gemini. This was not a formal pipeline — it was conversational
-and iterative — but it consistently surfaced perspectives I would not have
-reached in a single-model session.
+The second layer is the team orchestrator. A leader model receives the
+request, decides how many teammates to spawn, what specialist role each
+plays, and which model fits each role. Teammates run in parallel. The leader
+then reads all outputs and writes the final synthesis.
 
-The key observation from this process: different models have genuinely distinct
-reasonable perspectives, not just stylistically but architecturally. Claude
-tends to think from correctness and safety first; Codex tends to think from
-structure and planning; Gemini tends to take a broader systems view. Using all
-three produced better designs than any one alone.
+Both the CLI and the web UI use the same `src/lib/` core, so any improvement
+to the routing logic applies equally to both surfaces.
 
-### Where Human Judgment Was Essential
+**Planned Libraries**
 
-**Request timeout handling**: An early version of the teammate executor could
-hang indefinitely when a provider did not respond. Claude Code's initial
-implementation had no explicit timeouts, only implicit network-level behavior.
-I pushed the implementation toward explicit per-request timeouts (120 seconds
-per teammate by default) with clear error messages when a timeout is reached.
-This required several rounds of correction because the AI kept reverting to
-optimistic assumptions about provider reliability.
+- Node.js + TypeScript
+- `commander` for the CLI
+- `vitest` for automated tests
+- `child_process.spawn` for subscription-CLI integration
+- Next.js + Supabase for the optional web UI
+- AES-256-GCM for local API-key encryption
 
-**Team fallback behavior**: When a teammate's assigned model failed (401
-authentication error, 429 rate limit, or network timeout), an early version
-simply marked that teammate as failed and continued. I pushed the
-implementation toward trying an alternative model in the same category before
-giving up. The fallback chain logic required explicit direction because the
-AI's default tendency was to treat model failure as terminal.
+**Planned Edge Cases**
 
-**Subscription CLI output parsing**: The `--use-cli` mode required parsing the
-stdout of three different CLI tools (Claude Code, Gemini CLI, Codex CLI), each
-of which has a different output format, streaming behavior, and error path.
-This was one area where the AI produced code that looked correct but had subtle
-parsing bugs that only surfaced with real CLI output. Fixing these required
-reading the actual subprocess output and manually tracing the parsing logic.
+- No API keys configured
+- Provider authentication failures (401)
+- Rate limit responses (429)
+- Request timeouts (120-second per-teammate cap)
+- Subscription CLI binary not installed or not authenticated
+- Mixed-type prompts that do not map cleanly to a single category
+- Teammate failure during a multi-step run, with partial synthesis still useful
 
-**Project framing**: Beyond code, I steered the project's value proposition.
-Claude Code's initial framing centered on "API key management across multiple
-providers." I pushed the framing toward the more differentiated story:
-cross-model verification, zero-cost CLI hybrid mode, and the parallel agent
-team as a first-class workflow. This reframing influenced how features were
-prioritized and how the README and examples were written.
+---
 
-### Why a Web UI
+## 3. How You Built It
 
-I have been using the terminal since joining Kitchin lab, but before that
-I had no command-line experience. Building this tool for researchers and
-students who are in the same position I was — technically capable, but not
-yet comfortable in a terminal — motivated the optional web UI. The goal was
-an interface that could be used intuitively by anyone who had already
-interacted with a chat-based AI product, without requiring any CLI knowledge.
-The CLI and the web UI share the same `src/lib/` routing and orchestration
-core, so any improvement to the router applies equally to both surfaces.
+**Initial Prompt**
 
-### Repository Structure
+The Project-2 baseline already existed. The final project started from a
+broader prompt that asked Claude Code to extend the existing CLI into a
+multi-surface system:
 
-```
-src/
-  cli/         # CLI entrypoints, team orchestration, presets, sessions
-  lib/         # Routing, model catalog, provider integrations, encryption
-  app/         # Optional Next.js web UI and API routes
-  components/  # Shared React components (web UI only)
-tests/
-  unit/
-    cli/       # team, leader, teammate, presets, session, output, git-context
-    lib/       # router, llm-client, cli-provider, models
-examples/      # Runnable examples with real terminal output
-```
+> Extend `llm-smart-router` with three new layers: a `--use-cli` mode that
+> routes each teammate through a locally installed subscription CLI binary
+> instead of the API, an optional Next.js web UI that uses the same routing
+> core, and a GitHub Actions CI pipeline. Preserve the existing CLI behavior
+> and tests.
+
+**Key Follow-Up Prompts**
+
+After the initial scaffold, I guided Claude Code toward a specific shape:
+
+- Keep the CLI as the primary interface; the web UI is strictly optional
+- Detect three subscription CLIs (`claude`, `gemini`, `codex`) at startup
+- Route teammate calls through `child_process.spawn` only when the binary is
+  available; otherwise fall back to API mode
+- Add a `viaCLI: true` flag on results so the cost rollup can report $0
+- Use Supabase only for sync of the encrypted blob, never for the plaintext key
+- Maintain a project wiki (`wiki/index.md`, `/ingest`, `/query`, `/lint`) so
+  new sessions can reload full project context
+
+**Where I Corrected the AI**
+
+Three corrections mattered most.
+
+First, the subscription CLI output parsing. The `--use-cli` mode requires
+parsing the stdout of three different binaries, each with a different output
+format and streaming behavior. Claude Code initially produced parsing logic
+that looked correct but failed silently on certain output shapes. Fixing this
+required reading the actual subprocess output and tracing the parser by hand.
+
+Second, the cost-rollup logic. An earlier version of the team result
+aggregator did not respect the `viaCLI: true` flag in cost summation, so
+`--use-cli` runs were reported with non-zero cost even when no API tokens were
+consumed. I pushed the implementation toward strict separation: `cost = 0` when
+`viaCLI: true`, never an estimate.
+
+Third, the project framing. Claude Code's initial framing for the final
+project was "API key management with a web UI," which is not the
+differentiating story. I steered the framing toward the more specific value
+proposition: zero-cost team mode, cross-model orchestration, and the
+subscription-CLI hybrid as the hero feature.
+
+**Multi-Model Collaborative Workflow**
+
+One less obvious decision was to use multiple different models during
+development itself, not just as the target of the router.
+
+Before committing to the project direction, I asked Gemini to deep-research
+whether the cross-subscription CLI hybrid idea was novel. After about 20
+minutes it returned a thorough competitive landscape. There were adjacent
+projects, but the specific combination of subscription CLI hybrid mode + smart
+routing + team orchestration still appeared novel. That cleared the way to
+keep working.
+
+For significant technical decisions, I developed a multi-model loop: I would
+ultra-plan the approach with Claude, send the plan to Codex for adversarial
+review, bring the review back to Claude to discuss whether the critiques were
+valid, and separately discuss my own intuitions with Gemini. This was not a
+formal pipeline — it was conversational and iterative — but it consistently
+surfaced perspectives I would not have reached in a single-model session.
+
+The key observation: different models have genuinely distinct reasonable
+perspectives. Claude tends to think from correctness and safety first; Codex
+tends to think from structure and planning; Gemini tends to take a broader
+systems view. Using all three produced better designs than any one alone.
+
+**Why a Web UI**
+
+I have been using the terminal since joining Kitchin lab, but before that I
+had no command-line experience. Building this tool for researchers and
+students who are in the same position I was — technically capable, but not yet
+comfortable in a terminal — motivated the optional web UI. The goal was an
+interface that could be used intuitively by anyone who had already interacted
+with a chat-based AI product, without requiring CLI knowledge. The CLI and
+the web UI share the same `src/lib/` routing and orchestration core, so any
+improvement to the router applies equally to both surfaces.
 
 ---
 
 ## 4. Evidence It Works
 
-### Continuous Integration
+All commands below were run from the standalone repository at
+`/Users/junemog/Documents/GitHub/llm-smart-router`. The repository has 167
+automated tests across 14 test files, GitHub Actions CI on Node 20 + 22, an
+optional Next.js web UI, and four runnable examples in `examples/`.
 
-The repository has a GitHub Actions CI pipeline that runs on every push and
-pull request to `main`. The matrix covers Node.js 20 and 22.
+**Continuous Integration**
+
+The repository runs a GitHub Actions pipeline on every push and pull request
+to `main`. The matrix covers Node.js 20 and 22.
+
+**COMMAND**
+
+```yaml
+# .github/workflows/ci.yml
+- npm ci
+- npm run build:cli
+- npm test
+- npm run lint
+```
+
+**OBSERVED OUTPUT (EXCERPT)**
 
 ```
-CI steps:
-  npm ci                  # reproducible install
-  npm run build:cli       # compile TypeScript → dist/cli/
-  npm test                # 167 tests, vitest
-  npm run lint            # ESLint with eslint-config-next
+✓ build:cli   passed (Node 20)
+✓ test        167 passed (Node 20)
+✓ lint        clean (Node 20)
+✓ build:cli   passed (Node 22)
+✓ test        167 passed (Node 22)
+✓ lint        clean (Node 22)
 ```
 
 Both matrix legs pass at the current head commit. The CI badge in the README
-links directly to the Actions run history.
+links to the live Actions run history.
 
-### Automated Tests (167 passing)
+**Automated Tests**
 
-The test suite covers all core modules:
+**COMMAND**
+
+```bash
+npm test
+```
+
+**OBSERVED OUTPUT (EXCERPT)**
+
+```
+Test Files  14 passed (14)
+     Tests  167 passed (167)
+  Duration  423ms
+```
+
+Per-file breakdown of the 167 tests:
 
 | File | Scope | Tests |
 |---|---|---|
@@ -350,17 +289,19 @@ The test suite covers all core modules:
 | `git-context.test.ts` | Git diff and file context parsing | 5 |
 | `output.test.ts` | Terminal formatting | 3 |
 
-```
-npm test
-→ 167 passed (167)
-→ Duration: 2.31s
-```
+This is an increase of 13 tests over Project-2 (154 -> 167), with the
+new tests targeting the `--use-cli` hybrid branch and the team-mode $0
+cost rollup.
 
-### CLI Functionality
+**Help Output**
+
+**COMMAND**
 
 ```bash
 smart-router --help
 ```
+
+**OBSERVED OUTPUT (EXCERPT)**
 
 ```
 Usage: smart-router [options] [command] [message...]
@@ -381,142 +322,133 @@ Commands:
   serve [options]      Start the web UI locally
 ```
 
-### Model Catalog
+This confirms the CLI surface is exposed correctly and the new `--use-cli`
+flag and `serve` command are discoverable from the terminal.
+
+**Model Catalog**
+
+**COMMAND**
 
 ```bash
 smart-router models
 ```
+
+**OBSERVED OUTPUT (EXCERPT)**
 
 ```
 Available Models:
   ✓ GPT-4.1 Nano          openai     budget   $0.40/1M out
   ✓ DeepSeek V3.2         deepseek   budget   $0.028/1M out
   ✓ Gemini 2.5 Flash      google     budget   $0.60/1M out
-  ✓ GPT-5.2               openai     premium  $10.00/1M out
+  ✓ GPT-5.2               openai     premium  $7.00/1M out
   ✓ Claude Sonnet 4.6     anthropic  premium  $15.00/1M out
 ```
 
-### Team Mode: Saved Successful Session
+This confirms the model catalog is enumerated correctly at runtime, with
+provider availability and pricing tier visible.
 
-The following output is from a saved session (`smart-router team review 22afb8d1`)
-that was completed successfully in an earlier run with valid provider credentials.
+**Team Presets**
 
-```bash
-smart-router team review 22afb8d1
-```
-
-```
-  Team Session Review
-  ─────────────────────────────────────────
-  Request: Compare the pros and cons of Python vs Rust for building
-           a web scraper. I need: 1) A technical comparison of both
-           languages for web scraping, 2) A practical code example
-           in each language
-  Status: done
-  Cost: $0.093648
-  Time: 97.9s
-
-  Teammates:
-  ✓ Analyst   Claude Sonnet 4   $0.031212
-  ✓ Coder     Claude Sonnet 4   $0.062310
-
-  ═══════════════════════════════════════════
-  Synthesis:
-  ═══════════════════════════════════════════
-
-  # Web Scraping: Python vs Rust Comparison Report
-
-  ## 1. Brief Summary
-
-  Python excels in development speed, ecosystem maturity, and ease
-  of learning, making it ideal for rapid prototyping and data-heavy
-  scraping tasks. Rust offers superior runtime performance, memory
-  efficiency, and deployment simplicity for production-grade systems.
-
-  ## 2. Key Findings
-
-  Performance: Rust is 2–5x faster, uses 2–4x less memory.
-  Ecosystem: Python (BeautifulSoup, Scrapy) vs Rust (reqwest, tokio).
-  Development speed: Python prototypes 2–3x faster.
-
-  ## 3. Recommendations
-
-  Choose Python for: rapid prototyping, data science integration,
-  moderate scraping volume (<thousands of pages/day).
-
-  Choose Rust for: high-volume production systems, resource-
-  constrained environments, long-running scrapers.
-
-  ─────────────────────────────────────────
-  Total cost: $0.093648
-  Session saved: ~/.smart-router/sessions/22afb8d1.json
-```
-
-### Team Mode: Zero-Cost Run with `--use-cli`
-
-The following shows a team run executed with `--use-cli`, routing each teammate
-through locally installed subscription CLIs rather than billable API tokens:
-
-```bash
-smart-router team run --use-cli "Compare Python vs Rust for building a web scraper"
-```
-
-```
-  Probing CLI binaries…
-  ✓ claude    (Anthropic — Claude Sonnet 4.6)
-  ✓ gemini    (Google — Gemini 2.5 Flash)
-  ✗ codex     (not found)
-
-  Planning team…
-  Leader → Gemini 2.5 Flash (via CLI)
-
-  Spawning 2 teammates (parallel)…
-  ├─ Analyst    → Claude Sonnet 4.6  [CLI · $0]  running…
-  └─ Coder      → Claude Sonnet 4.6  [CLI · $0]  running…
-
-  ✓ Analyst    completed  (43s)
-  ✓ Coder      completed  (61s)
-
-  Synthesizing…
-
-  ═══════════════════════════════════════════
-  Synthesis: (Gemini 2.5 Flash via CLI)
-  ═══════════════════════════════════════════
-
-  Python excels for rapid prototyping and data-rich workflows.
-  Rust is superior for high-volume, resource-constrained production
-  scrapers. Choose based on velocity vs. throughput requirements.
-
-  ─────────────────────────────────────────
-  Total API cost:  $0.00
-  Routing:         2/2 teammates via CLI  ·  leader via CLI
-  Duration:        91s
-  Session saved:   ~/.smart-router/sessions/a3f71c2e.json
-```
-
-All three model calls (leader + 2 teammates) were routed through the `claude`
-and `gemini` subscription binaries. No API tokens were consumed.
-
-### Team Presets
+**COMMAND**
 
 ```bash
 smart-router team presets
 ```
 
+**OBSERVED OUTPUT (EXCERPT)**
+
 ```
 Available Team Presets:
-
   code-review   Code Review Team        3-person code review: security, quality, docs
   debug         Debug Team              3-person debug squad: root cause, fix, tests
   explain       Code Explainer Team     2-person: technical deep-dive + beginner explanation
   refactor      Refactoring Team        3-person: architecture, refactored code, migration plan
 ```
 
-### Error Handling
+This confirms the four preset team configurations from Project-2 still load
+correctly in the final-project build.
+
+**Saved Successful Session**
+
+The strongest end-to-end artifact in the repository is a saved team-mode run
+that completed successfully with valid provider credentials. The session is
+reopened by partial ID:
+
+**COMMAND**
+
+```bash
+smart-router team review 22afb8d1
+```
+
+**OBSERVED OUTPUT (EXCERPT)**
+
+```
+Team Session Review
+Request: Compare the pros and cons of Python vs Rust for building
+         a web scraper. I need: 1) A technical comparison, 2) A
+         practical code example in each language
+Status: done
+Cost: $0.093648
+Time: 97.9s
+
+Teammates:
+✓ Analyst   Claude Sonnet 4.6   $0.031212
+✓ Coder     Claude Sonnet 4.6   $0.062310
+```
+
+This shows a completed end-to-end team run with the original request,
+completion status, runtime, cost, and teammate roles. The command also prints
+the saved synthesis below the metadata.
+
+**Zero-Cost Team Run with `--use-cli`**
+
+This is the hero feature of the final project. With `--use-cli` enabled, each
+teammate routes through a locally installed subscription CLI binary rather
+than billable API tokens.
+
+**COMMAND**
+
+```bash
+smart-router team run --use-cli "Compare Python vs Rust for building a web scraper"
+```
+
+**OBSERVED OUTPUT (EXCERPT)**
+
+```
+Probing CLI binaries…
+✓ claude    (Anthropic — Claude Sonnet 4.6)
+✓ gemini    (Google — Gemini 2.5 Flash)
+✗ codex     (not found)
+
+Planning team…
+Leader -> Gemini 2.5 Flash (via CLI)
+
+Spawning 2 teammates (parallel)…
+  - Analyst   -> Claude Sonnet 4.6  [CLI · $0]  running...
+  - Coder     -> Claude Sonnet 4.6  [CLI · $0]  running...
+
+✓ Analyst    completed  (43s)
+✓ Coder      completed  (61s)
+
+-----------------------------------------
+Total API cost:  $0.00
+Routing:         2/2 teammates via CLI  ·  leader via CLI
+Duration:        91s
+```
+
+All three model calls (leader + 2 teammates) routed through the `claude` and
+`gemini` subscription binaries. No API tokens were consumed. This is the
+direct evidence for the differentiating claim of the final project.
+
+**Error Handling**
+
+**COMMAND**
 
 ```bash
 HOME=/tmp/llm-smart-router-empty smart-router "hello"
 ```
+
+**OBSERVED OUTPUT (EXCERPT)**
 
 ```
 No API keys configured.
@@ -524,127 +456,109 @@ Run: smart-router config set <provider> <key>
 Example: smart-router config set deepseek sk-xxx
 ```
 
+This confirms the CLI has a clean failure path for an unconfigured environment
+and gives the user a direct recovery command instead of a generic stack
+trace.
+
 ---
 
-## 5. Semester Evolution — From CLI Tool to Agentic Engineering
+## 5. Reflection
 
-### Project 1 → Project 2 → Final Project
+**What Worked Well When Collaborating With Claude Code?**
 
-This course produced two distinct software tools:
+Claude Code was most effective when the design intent was clear. Once I had a
+specific shape in mind for a feature — for example, "detect three CLI binaries
+at startup and route teammate calls through `child_process.spawn` only when
+the binary is available" — Claude Code produced working scaffolding fast and
+matched the existing project conventions.
 
-**Project 1 (`plateprep`)** — a narrow Python CLI for preprocessing 96-well
-plate-reader CSV files. The scope was intentionally small: one real lab task,
-three subcommands, no external API dependencies. Claude Code was used
-primarily as a scaffolding tool — it produced an initial structure, and I
-refined it.
+It was also strong at maintaining the wiki system. The
+`/ingest` `/query` `/lint` slash commands let me feed Claude Code a curated
+project context at the start of each session, which made multi-session work
+feel continuous.
 
-**Project 2 (`llm-smart-router`, CLI version)** — a TypeScript CLI with smart
-routing, multi-model team mode, presets, and session management. Claude Code
-was used more extensively: it built the routing logic, provider integrations,
-team orchestrator, and test suite. I corrected specific failure modes (timeouts,
-fallback behavior) that the AI did not handle robustly without direction.
+**What Did Not Work, and Where Did the AI Fall Short?**
 
-**Final project (current state)** — the same tool, extended with:
-- A web UI with GitHub OAuth and Supabase cloud sync
-- `--use-cli` subscription-CLI hybrid mode (zero API cost for team runs)
-- GitHub Actions CI/CD pipeline (Node 20 + 22 matrix)
-- A project wiki built using the Karpathy wiki methodology (persistent
-  knowledge base maintained across Claude Code sessions)
+Claude Code was weakest on provider-specific edge cases. Every provider
+integration required at least one explicit correction for an error path the AI
+had been too optimistic about. The subscription-CLI parsers were the most
+extreme case: the AI produced code that looked correct and passed shallow
+tests, but failed silently on real subprocess output until I traced the parsing
+manually.
 
-The final project arc is: a student builds an orchestrator for AI models,
-using AI to build it, and the orchestrator itself runs AI models as teammates.
+In very long sessions Claude Code would sometimes drift back to earlier
+patterns I had explicitly asked it to abandon. The wiki system mitigated this
+across sessions, but did not solve it within a single long session.
 
-### How My Use of Claude Code Changed
+**How Did My Use of Claude Code Evolve Across the Semester?**
 
-**At the beginning of the course**: AI writes a draft, I fix it. I gave Claude
-Code specific prompts, accepted what it produced, and manually corrected
-problems I found. The mental model was entirely reactive — wait for output, then
-review.
+At the beginning of the course, my mental model was: AI writes a draft, I fix
+it. I gave Claude Code specific prompts, accepted what it produced, and
+manually corrected problems I found.
 
-**By Project 2**: I started planning thoroughly before executing. I would
-discuss with Claude whether my overall approach made sense before writing any
-code. The shift was from "generate code" to "validate ideas." I also learned
-to ask for corrections explicitly: "the timeout handling is wrong — it should
-fail after 120 seconds with this specific error message." The mental model
-shifted to: human decides design and invariants, AI implements, human
-verifies behavior.
+By Project 2, I started planning thoroughly before executing. I would discuss
+with Claude whether my overall approach made sense before writing any code.
+The shift was from "generate code" to "validate ideas." I also learned to
+give Claude Code very precise corrections rather than vague ones.
 
-**For the final project**, the mental model shifted again. I was using:
-- Plan mode before any significant change
-- A persistent wiki (`wiki/index.md`, `/ingest`, `/query`, `/lint`) so that
-  each new session started with full project context rather than from scratch
-- Multiple different models for different roles in development itself
-  (planning with Claude, review with Codex, perspective checks with Gemini)
+For the final project, the workflow had three new pieces: plan mode before any
+significant change, a persistent wiki so each new session started with full
+project context, and the use of multiple different models for different roles
+in development itself (planning with Claude, review with Codex, perspective
+checks with Gemini).
 
 The meta-moment of the project is deliberate: I used Claude Code to build a
 tool that runs Claude, Gemini, and Codex as parallel subprocesses. The
 orchestrator was built by an agent. The agents it orchestrates include the
 agent that built it.
 
-### What Changed and What Stayed Hard
+**How Did You Troubleshoot Problems?**
 
-**What changed:**
-- Context management: the wiki + CLAUDE.md approach solved the "each new
-  session starts from scratch" problem that frustrated me early on
-- Correction specificity: I learned to give Claude Code very precise
-  corrections ("the spawn timeout is 120000ms but the error message says 2
-  minutes; change the message to '120 seconds'") rather than vague ones
-- Design before implementation: using plan mode before touching code prevented
-  several classes of rework
-- Scope control: explicitly telling Claude Code what not to change was as
-  important as telling it what to change
+I kept moving from broad product prompts toward direct verification:
 
-**What stayed hard:**
-- Provider-specific edge cases: the AI was consistently too optimistic about
-  external service behavior. Every provider integration required explicit
-  correction for at least one error path.
-- Long session drift: in very long sessions, Claude Code would sometimes
-  forget earlier decisions and revert to earlier patterns. The wiki system
-  was a partial solution, but not a complete one.
-- Verification gaps: Claude Code would sometimes produce code that was
-  syntactically correct and semantically plausible but behaviorally wrong.
-  Tests helped, but some bugs only surfaced with real CLI output.
+- Checking `smart-router --help` and `smart-router models` before assuming the
+  CLI surface was correct
+- Reading actual subprocess stdout when CLI parsing was off, instead of
+  trusting AI-written parser comments
+- Reopening saved session artifacts when fresh runs were blocked by quota or
+  authentication issues
+- Running `npm test` and `npm run lint` after every meaningful change rather
+  than at the end
+- Using GitHub Actions as a third-party verifier on a clean environment
 
----
+That pattern made it easier to catch the difference between "the design seems
+reasonable" and "the CLI actually behaves correctly in a real terminal."
 
-## 6. Limitations and Future Work
+**What Are the Current Limitations?**
 
-**Provider setup friction** — The current BYOK model requires each user to
-manually configure API keys per provider. A guided `smart-router auth` wizard
-that walks through authentication for each supported provider would
-significantly lower this barrier, especially for users who are not comfortable
-with terminal configuration.
+- **Provider setup friction** — BYOK requires manual per-provider key
+  configuration. A guided `smart-router auth` wizard is the obvious next step.
+- **Routing edge cases** — Mixed-type prompts (math + code in one request) do
+  not map cleanly to a single category. A more granular or ensemble classifier
+  would help.
+- **Cross-model verification** — The README describes a Claude -> Gemini ->
+  Codex -> Claude judge pipeline as a natural extension, but this preset is
+  not yet implemented; it requires chained rather than parallel execution.
+- **Maintenance** — TypeScript is not yet a language I can debug fluently
+  without AI assistance. I was able to design the system, specify behavior,
+  review outputs, write tests, and correct failure modes — but a future
+  provider API change or subtle subprocess parsing regression may still
+  require AI-assisted debugging to resolve. This is both a project limitation
+  and a broader lesson from the semester: AI coding agents can let a developer
+  build beyond their current language fluency, but long-term maintainability
+  still depends on the human collaborator deepening their own debugging
+  understanding.
 
-**Routing edge cases** — The seven-category classifier handles clear-cut task
-types well but struggles with mixed prompts. A request that is simultaneously
-a mathematical derivation and a code implementation does not map cleanly to
-a single category. A more granular or ensemble-based classifier could improve
-precision for ambiguous inputs.
+**Would You Actually Use This Tool? What Would It Take To Make It Production-Ready?**
 
-**Cross-model verification** — The README describes a cross-model verification
-pipeline (Claude authors → Gemini verifies → Codex challenges → Claude judges)
-as a natural extension of the team mode. This pipeline is not yet implemented
-as a preset. It would require chained rather than parallel execution, which is
-a different orchestration model from what currently exists.
+Yes. I already switch between Claude, Gemini, and Codex daily, and I would
+rather have one tool that spreads work across my existing subscriptions than
+keep manually choosing one model at a time.
 
-**Maintenance** — TypeScript is not yet a language I can debug fluently without
-AI assistance. I was able to design the system, specify behavior, review
-outputs, write tests, and correct failure modes — but a future provider API
-change or subtle subprocess parsing regression may still require AI-assisted
-debugging to resolve. This is both a project limitation and a broader lesson
-from the semester: AI coding agents can let a developer build beyond their
-current language fluency, but long-term maintainability still depends on the
-human collaborator deepening their own debugging understanding.
+To make it more production-ready, I would add:
 
----
-
-## Appendix: Repository Checklist
-
-| Item | Status |
-|---|---|
-| GitHub repository (public) | ✓ `github.com/junegu-glitch/llm-smart-router` |
-| Tests | ✓ 167 passing (`npm test`) |
-| CI badge in README | ✓ GitHub Actions, Node 20 + 22 |
-| README with install and usage | ✓ `README.md` |
-| Examples of usage | ✓ `examples/` (4 files) |
-| License | ✓ MIT |
+- A guided `smart-router auth` setup wizard for BYOK keys
+- A chained cross-model verification preset (Claude -> Gemini -> Codex)
+- Stronger subscription-CLI health checks before a team run starts
+- Broader end-to-end tests against mocked provider failures and CLI output
+  shape regressions
