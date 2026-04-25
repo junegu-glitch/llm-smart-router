@@ -1,15 +1,18 @@
-# llm-smart-router
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:88vh;text-align:center;">
+  <div>
+    <h1 style="font-size:2.8em;font-weight:bold;margin-bottom:0.4em;">llm-smart-router</h1>
+    <p style="color:#555;font-size:1.05em;margin:0;">A multi-model AI agent orchestrator with cross-subscription CLI hybrid mode</p>
+  </div>
+  <div style="margin-top:auto;text-align:center;line-height:1.8;">
+    <p style="margin:0;"><strong>Final Project Report</strong><br>
+    June Gu<br>
+    06-642 · Spring 2026<br>
+    Carnegie Mellon University<br>
+    <a href="https://github.com/junegu-glitch/llm-smart-router">github.com/junegu-glitch/llm-smart-router</a></p>
+  </div>
+</div>
 
-A multi-model AI agent orchestrator with cross-subscription CLI hybrid mode
-
-**Final Project Report**
-June Gu
-06-642 · Spring 2026
-Carnegie Mellon University
-
-GitHub: https://github.com/junegu-glitch/llm-smart-router
-
----
+<div style="page-break-after:always;"></div>
 
 ## 1. The Idea
 
