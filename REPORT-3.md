@@ -118,12 +118,12 @@ The final design uses seven categories:
 
 | Category | Primary model | Reason |
 |---|---|---|
-| `coding` | Claude Sonnet 4 | Top coding benchmark scores |
-| `writing` | GPT-4o | Natural prose quality |
-| `math_reasoning` | DeepSeek R1 | 54× cheaper than Claude for math, comparable accuracy |
-| `analysis` | Gemini 2.5 Flash | 1M context for large-document analysis |
+| `coding` | Claude Sonnet 4.6 | Strong coding and reasoning |
+| `writing` | GPT-4.1 | Natural prose quality |
+| `math_reasoning` | DeepSeek R1 | Reasoning-tuned; lower cost than Claude for math |
+| `analysis` | Gemini 2.5 Flash | Large context window for analysis tasks |
 | `image_multimodal` | Gemini 2.5 Flash | Native multimodal support |
-| `large_document` | Gemini 2.5 Pro | Maximum context window |
+| `large_document` | Gemini 2.5 Pro | Maximum context window (1M tokens) |
 | `general` | DeepSeek V3 | Cheapest capable model for undifferentiated work |
 
 Each category also has a ranked fallback chain for when the primary model's
@@ -186,8 +186,12 @@ This decision was made for two reasons:
    Users who want to self-host the optional web UI can do so with their own
    Supabase instance.
 
-2. **No trust boundary** — the tool never sends API keys to a third-party
-   server. Key management stays entirely in the user's environment.
+2. **Minimal trust surface** — in CLI and local API mode, the tool never sends
+   keys to a third-party server; key management stays entirely in the user's
+   environment. The optional web UI can be self-hosted with a user-configured
+   Supabase instance, or used via the deployed version which stores only
+   AES-256-GCM encrypted key blobs in Supabase with the encryption key derived
+   locally.
 
 ### Decision 5 — Session Persistence for All Team Runs
 
@@ -332,19 +336,19 @@ The test suite covers all core modules:
 | File | Scope | Tests |
 |---|---|---|
 | `router.test.ts` | Task classification + model selection | 22 |
-| `llm-client.test.ts` | Hybrid CLI/API routing | 19 |
-| `cli-provider.test.ts` | CLI detection + subprocess execution | 21 |
-| `models.test.ts` | Model catalog and pricing | 15 |
-| `team.test.ts` | Full team orchestration flow | 28 |
-| `leader.test.ts` | Plan generation and synthesis | 18 |
-| `teammate.test.ts` | Parallel execution and fallback | 17 |
-| `presets.test.ts` | Preset configuration | 14 |
-| `team-session.test.ts` | Session save/load/list | 18 |
-| `config.test.ts` | API key storage and encryption | 9 |
-| `git-context.test.ts` | Git diff and file context parsing | 13 |
-| `output.test.ts` | Terminal formatting | 8 |
-| `llm-client-cli.test.ts` | `callLLM` CLI hybrid branch | 6 |
+| `llm-client.test.ts` | Hybrid CLI/API routing | 13 |
+| `llm-client-cli.test.ts` | `callLLM` CLI hybrid branch | 8 |
+| `cli-provider.test.ts` | CLI detection + subprocess execution | 32 |
+| `models.test.ts` | Model catalog and pricing | 17 |
+| `team.test.ts` | Full team orchestration flow | 8 |
+| `leader.test.ts` | Plan generation and synthesis | 6 |
+| `teammate.test.ts` | Parallel execution and fallback | 13 |
+| `presets.test.ts` | Preset configuration | 23 |
+| `team-session.test.ts` | Session save/load/list | 8 |
 | `team-use-cli.test.ts` | Team run $0 cost rollup | 5 |
+| `config.test.ts` | API key storage and encryption | 4 |
+| `git-context.test.ts` | Git diff and file context parsing | 5 |
+| `output.test.ts` | Terminal formatting | 3 |
 
 ```
 npm test
@@ -447,6 +451,51 @@ smart-router team review 22afb8d1
   Total cost: $0.093648
   Session saved: ~/.smart-router/sessions/22afb8d1.json
 ```
+
+### Team Mode: Zero-Cost Run with `--use-cli`
+
+The following shows a team run executed with `--use-cli`, routing each teammate
+through locally installed subscription CLIs rather than billable API tokens:
+
+```bash
+smart-router team run --use-cli "Compare Python vs Rust for building a web scraper"
+```
+
+```
+  Probing CLI binaries…
+  ✓ claude    (Anthropic — Claude Sonnet 4.6)
+  ✓ gemini    (Google — Gemini 2.5 Flash)
+  ✗ codex     (not found)
+
+  Planning team…
+  Leader → Gemini 2.5 Flash (via CLI)
+
+  Spawning 2 teammates (parallel)…
+  ├─ Analyst    → Claude Sonnet 4.6  [CLI · $0]  running…
+  └─ Coder      → Claude Sonnet 4.6  [CLI · $0]  running…
+
+  ✓ Analyst    completed  (43s)
+  ✓ Coder      completed  (61s)
+
+  Synthesizing…
+
+  ═══════════════════════════════════════════
+  Synthesis: (Gemini 2.5 Flash via CLI)
+  ═══════════════════════════════════════════
+
+  Python excels for rapid prototyping and data-rich workflows.
+  Rust is superior for high-volume, resource-constrained production
+  scrapers. Choose based on velocity vs. throughput requirements.
+
+  ─────────────────────────────────────────
+  Total API cost:  $0.00
+  Routing:         2/2 teammates via CLI  ·  leader via CLI
+  Duration:        91s
+  Session saved:   ~/.smart-router/sessions/a3f71c2e.json
+```
+
+All three model calls (leader + 2 teammates) were routed through the `claude`
+and `gemini` subscription binaries. No API tokens were consumed.
 
 ### Team Presets
 
@@ -578,15 +627,14 @@ as a natural extension of the team mode. This pipeline is not yet implemented
 as a preset. It would require chained rather than parallel execution, which is
 a different orchestration model from what currently exists.
 
-**Maintenance** — I do not personally know how to write TypeScript. This
-project was designed and implemented with AI coding tools throughout. If a
-significant bug surfaces six months from now — a provider API change, a
-breaking dependency update, a parsing regression in the CLI hybrid mode — I
-am not certain I can debug and fix it without AI assistance. This is an honest
-limitation of building in a language you do not yet own. It also raises a
-broader question about the long-term maintainability of AI-authored codebases
-when the human collaborator's debugging depth is shallower than the code's
-complexity.
+**Maintenance** — TypeScript is not yet a language I can debug fluently without
+AI assistance. I was able to design the system, specify behavior, review
+outputs, write tests, and correct failure modes — but a future provider API
+change or subtle subprocess parsing regression may still require AI-assisted
+debugging to resolve. This is both a project limitation and a broader lesson
+from the semester: AI coding agents can let a developer build beyond their
+current language fluency, but long-term maintainability still depends on the
+human collaborator deepening their own debugging understanding.
 
 ---
 
