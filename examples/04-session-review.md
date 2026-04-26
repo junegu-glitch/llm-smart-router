@@ -44,8 +44,8 @@ smart-router team review 22afb8d1
   Time: 97.9s
 
   Teammates:
-  ✓ Analyst   Claude Sonnet 4   $0.031212
-  ✓ Coder     Claude Sonnet 4   $0.062310
+  ✓ Analyst   Claude Sonnet 4.6   $0.031212
+  ✓ Coder     Claude Sonnet 4.6   $0.062310
 
   ═══════════════════════════════════════════
   Synthesis:

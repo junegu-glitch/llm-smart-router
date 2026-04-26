@@ -2,6 +2,8 @@
 
 `smart-router team run` spins up a multi-model agent team: a leader plans the work, teammates execute in parallel, and the leader synthesizes a final report.
 
+This page shows both normal API mode and `$0` API-cost CLI mode.
+
 ## Command
 
 ```bash
@@ -18,7 +20,9 @@ smart-router team run --no-interactive --use-cli \
   "Compare Python vs Rust for building a web scraper..."
 ```
 
-## Terminal Output
+## Terminal Output: API Mode
+
+Without `--use-cli`, teammates use configured API providers and costs vary by model and token usage.
 
 ```
   Smart Team — Multi-model agent team
@@ -42,9 +46,9 @@ smart-router team run --no-interactive --use-cli \
   ├─────────────────┬──────────────────┬──────────┬──────────┤
   │ Teammate        │ Model            │ Status   │ Cost     │
   ├─────────────────┼──────────────────┼──────────┼──────────┤
-  │ TechnicalAnalyst│ Claude Sonnet 4  │ ✓ done   │ $0.031   │
+  │ TechnicalAnalyst│ Claude Sonnet 4.6│ ✓ done   │ $0.031   │
   │ PythonCoder     │ GPT-4.1          │ ✓ done   │ $0.001   │
-  │ RustCoder       │ Claude Sonnet 4  │ ✓ done   │ $0.062   │
+  │ RustCoder       │ Claude Sonnet 4.6│ ✓ done   │ $0.062   │
   └─────────────────┴──────────────────┴──────────┴──────────┘
 
   - Leader synthesizing results...
@@ -91,9 +95,9 @@ smart-router team run --no-interactive --use-cli \
   ─────────────────────────────────────────
   Team Summary:
   Teammates: 3  Tasks: 3  Time: 97.9s
-  ✓ TechnicalAnalyst  Claude Sonnet 4  $0.031212
+  ✓ TechnicalAnalyst  Claude Sonnet 4.6  $0.031212
   ✓ PythonCoder       GPT-4.1          $0.000136
-  ✓ RustCoder         Claude Sonnet 4  $0.062310
+  ✓ RustCoder         Claude Sonnet 4.6  $0.062310
   Total cost: $0.093648
   Session saved: ~/.smart-router/sessions/2026-03-19_22afb8d1.json
 ```
@@ -105,7 +109,7 @@ smart-router team run --no-interactive --use-cli \
 3. **Synthesis** — The leader reads all teammate outputs and writes a unified final report that reconciles findings and highlights any conflicts.
 4. **Session saved** — The full session (inputs, teammate outputs, synthesis) is saved locally for later review.
 
-## $0 with `--use-cli`
+## $0 API Cost with `--use-cli`
 
 With `--use-cli`, each teammate uses your subscription CLI instead of billable API tokens:
 
@@ -116,5 +120,18 @@ smart-router team run --use-cli "Compare Python vs Rust..."
 # Codex teammates  → Codex CLI  (your OpenAI subscription)
 # Total API cost: $0.00
 ```
+
+Example cost summary in CLI mode:
+
+```text
+Team Summary:
+Teammates: 3  Tasks: 3  Time: 91.0s
+✓ TechnicalAnalyst  Claude Sonnet 4.6  $0.000000
+✓ PythonCoder       GPT-5.2            $0.000000
+✓ RustCoder         Claude Sonnet 4.6  $0.000000
+Total API cost: $0.00
+```
+
+The router still needs at least one configured API key for routing or leader planning. The teammate calls with supported CLI mappings avoid API billing.
 
 See [Example 04](./04-session-review.md) to replay a saved session.

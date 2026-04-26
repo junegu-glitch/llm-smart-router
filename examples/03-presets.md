@@ -1,6 +1,6 @@
 # Example 03 — Preset Templates
 
-Presets are pre-configured teams you can run instantly without the leader planning step. Each preset defines specialist roles, model assignments, and how the synthesis should be structured.
+Presets are pre-configured teams you can run instantly without the leader planning step. Each preset defines specialist roles, model assignments, and how the synthesis should be structured. The current built-in presets are `code-review`, `debug`, `explain`, and `refactor`.
 
 ## List Available Presets
 
@@ -85,4 +85,4 @@ smart-router team run --no-interactive --preset code-review --git-diff > review.
 smart-router team run --preset code-review --git-diff --use-cli "Review my changes"
 ```
 
-Uses your subscription CLIs. No API billing.
+Uses your subscription CLIs for supported teammate calls, avoiding API billing for those model calls. The CLI still expects at least one configured API key for routing or leader/planning steps.

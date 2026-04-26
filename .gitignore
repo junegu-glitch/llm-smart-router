@@ -41,3 +41,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# course deliverables (kept outside repo)
+REPORT*.md
+REPORT*.pdf
+REPORT*.html
+JOURNAL.md
+CHECKPOINT.md
+final_submission_checklist.md
+screenshot_commands.md
+presentation/
+evidence/
+screenshots/
+demo.cast
+*.cast
+.report-style.css
+.md-to-pdf.config.cjs
